@@ -19,6 +19,11 @@ typedef struct {
     Item *items;
 } ClientArgs;
 
+typedef struct {
+    int time;
+    int lostConection;
+} WaitConection;
+
 void *handle_client(void *args) {
     ClientArgs *client_args = (ClientArgs *)args;
     int client_socket = client_args->client_socket;
@@ -123,8 +128,11 @@ int main() {
     // Inicializar el temporizador
     pthread_t timer_thread_id;
     int shutdown_flag = 0;
-    if (pthread_create(&timer_thread_id, NULL, timer_thread, (void *)&shutdown_flag) != 0) {
-        perror("Error al crear el hilo del temporizador");
+    WaitConection timeconection;
+    timeconection.time = 30;
+    timeconection.lostConection = 0;
+
+    if (pthread_create(&timer_thread_id, NULL, timer_thread, &timeconection) != 0) {
         close(server_socket);
         exit(EXIT_FAILURE);
     }

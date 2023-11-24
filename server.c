@@ -8,6 +8,8 @@
 #define MAX_CLIENTS 1000
 #define ITEM_NAME_SIZE 5000
 
+int num_clients;
+
 typedef struct {
     char name[ITEM_NAME_SIZE];
     int value;
@@ -18,6 +20,10 @@ typedef struct {
     Item *items;
 } ClientArgs;
 
+typedef struct {
+    int time;
+    int lostConection;
+} WaitConection;
 
 int stringToInt(const char *str) 
 {
@@ -32,11 +38,18 @@ int stringToInt(const char *str)
     return result;
 }
 
-//void *time_client();
-
+void *timer_thread(void *args) {
+    WaitConection *timeActual = (WaitConection *) args;
+    int flag = timeActual->lostConection;
+    int timewait = timeActual->time; 
+    sleep(timewait); 
+    timeActual->lostConection = 1;
+    pthread_exit(NULL);
+}
 
 void *handle_client(void *args) 
 {
+    num_clients++;
     ClientArgs *client_args = (ClientArgs *)args;
     int client_socket = client_args->client_socket;
     Item *items = client_args->items;
@@ -92,17 +105,18 @@ void *handle_client(void *args)
 
     close(client_socket);
     free(args);
+    num_clients--;
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[])
 {
 
+    // Convierte los argumentos en enteros
     int client_num, time_wait;
     client_num = stringToInt(argv[1]);
     time_wait = stringToInt(argv[2]);
-
-    printf("%d - %d", client_num, time_wait);
+    num_clients = 0;
 
     int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
@@ -135,10 +149,28 @@ int main(int argc, char *argv[])
         close(server_socket);
         exit(EXIT_FAILURE);
     }
+    
+    //Temporizador
+    // Inicializar el temporizador
+    pthread_t timer_thread_id;
+
+    WaitConection timeconection;
+    timeconection.time = time_wait;
+    timeconection.lostConection = 0;
 
     printf("Servidor esperando conexiones...\n");
 
-    while (1) {
+    if (pthread_create(&timer_thread_id, NULL, timer_thread, &timeconection) != 0) {
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    pthread_join(timer_thread_id, NULL);
+    
+    
+    while (timeconection.lostConection != 1) 
+    {
+        
         client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
         if (client_socket == -1) {
             printf("Error al aceptar la conexión del cliente");
